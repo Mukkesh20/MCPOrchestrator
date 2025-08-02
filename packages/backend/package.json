@@ -1,0 +1,30 @@
+{
+    "name": "@enhanced-MCP-Orchestrator/backend",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+      "dev": "tsx watch src/index.ts",
+      "build": "tsc",
+      "start": "node dist/index.js"
+    },
+    "dependencies": {
+      "@trpc/server": "10.43.6",
+      "express": "^4.18.0",
+      "cors": "^2.8.5",
+      "sqlite3": "^5.1.6",
+      "drizzle-orm": "^0.29.0",
+      "ws": "^8.16.0",
+      "uuid": "^9.0.0",
+      "zod": "^3.22.0"
+    },
+    "_comment": "Using local implementation of @mcp/sdk in src/lib/mcp-sdk.ts",
+    "devDependencies": {
+      "@types/express": "^4.17.0",
+      "@types/cors": "^2.8.0",
+      "@types/ws": "^8.5.0",
+      "@types/uuid": "^9.0.0",
+      "tsx": "^4.6.0",
+      "typescript": "^5.3.0",
+      "drizzle-kit": "^0.20.0"
+    }
+  }
