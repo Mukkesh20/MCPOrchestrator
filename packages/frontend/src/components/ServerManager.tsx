@@ -25,6 +25,7 @@ const ServerManager = () => {
   });
 
   const namespacesQuery = trpc.namespaces.list.useQuery();
+  
   const serversQuery = trpc.servers.list.useQuery();
   const createServerMutation = trpc.servers.create.useMutation({
     onSuccess: () => {
@@ -53,20 +54,54 @@ const ServerManager = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      name: newServer.name,
-      type: newServer.type,
-      namespace: newServer.namespace,
-    } as any; // Use type assertion to avoid TypeScript errors
     
-    // Add conditional properties based on server type
-    if (newServer.type === 'STDIO') {
-      payload.command = newServer.command;
-      payload.args = newServer.args.split(' ');
-    } else if (newServer.type === 'HTTP') {
-      payload.url = newServer.url;
+    // Validate required fields
+    if (!newServer.name.trim()) {
+      alert('Server name is required');
+      return;
     }
     
+    if (!newServer.namespace.trim()) {
+      alert('Namespace is required');
+      return;
+    }
+    
+    // Build the base payload
+    const payload: any = {
+      name: newServer.name.trim(),
+      type: newServer.type,
+      namespace: newServer.namespace.trim(),
+    };
+    
+    // Add type-specific fields with proper validation
+    if (newServer.type === 'STDIO') {
+      if (!newServer.command.trim()) {
+        alert('Command is required for STDIO servers');
+        return;
+      }
+      payload.command = newServer.command.trim();
+      
+      // Handle args properly - filter out empty strings
+      if (newServer.args.trim()) {
+        payload.args = newServer.args.trim().split(/\s+/).filter(arg => arg.length > 0);
+      } else {
+        payload.args = [];
+      }
+    } else if (newServer.type === 'HTTP') {
+      if (!newServer.url.trim()) {
+        alert('URL is required for HTTP servers');
+        return;
+      }
+      try {
+        new URL(newServer.url.trim()); // Validate URL format
+        payload.url = newServer.url.trim();
+      } catch (error) {
+        alert('Please enter a valid URL');
+        return;
+      }
+    }
+    
+    console.log('Submitting payload:', payload); // Debug log
     createServerMutation.mutate(payload);
   };
 

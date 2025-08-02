@@ -28,14 +28,25 @@ export const appRouter = t.router({
 
     create: t.procedure
       .input(z.object({
-        name: z.string(),
+        name: z.string().min(1, "Name is required"),
         type: z.enum(['STDIO', 'HTTP']),
         command: z.string().optional(),
         args: z.array(z.string()).optional(),
         url: z.string().optional(),
-        namespace: z.string(),
+        namespace: z.string().min(1, "Namespace is required"),
       }))
       .mutation(async ({ input }) => {
+        console.log('📥 Received server creation input:', JSON.stringify(input, null, 2));
+
+        // Validate based on type
+        if (input.type === 'STDIO' && !input.command) {
+          throw new Error('Command is required for STDIO servers');
+        }
+
+        if (input.type === 'HTTP' && !input.url) {
+          throw new Error('URL is required for HTTP servers');
+        }
+
         const server = {
           id: Math.random().toString(36).substring(2, 15),
           ...input,
@@ -43,6 +54,7 @@ export const appRouter = t.router({
           middlewares: [],
           createdAt: new Date().toISOString()
         };
+
         servers.push(server);
         console.log('✅ Created server:', server.name);
         return server;
@@ -107,8 +119,8 @@ export const appRouter = t.router({
       .mutation(async ({ input }) => {
         const middlewareIndex = middlewares.findIndex(m => m.id === input.id);
         if (middlewareIndex >= 0) {
-          middlewares[middlewareIndex] = { 
-            ...middlewares[middlewareIndex], 
+          middlewares[middlewareIndex] = {
+            ...middlewares[middlewareIndex],
             ...input,
             updatedAt: new Date().toISOString()
           };
@@ -185,7 +197,7 @@ export const appRouter = t.router({
             }
           }
         }));
-        
+
         console.log(`🔧 Retrieved ${tools.length} tools for namespace: ${input.namespace}`);
         return {
           tools,
