@@ -3,9 +3,11 @@
 import sqlite3 from 'sqlite3';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // Get the directory name of the current module
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Initialize SQLite database
 const sqlite = new sqlite3.Database(join(__dirname, '../../../db.sqlite'));

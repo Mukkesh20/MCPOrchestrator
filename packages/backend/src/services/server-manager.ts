@@ -12,7 +12,11 @@ export class MCPServerManager {
     const serverId = config.id || uuidv4();
     
     if (config.type === 'STDIO') {
-      const process = spawn(config.command!, config.args || [], {
+      if (!config.command) {
+        throw new Error('Command is required for STDIO servers');
+      }
+
+      const process = spawn(config.command, config.args || [], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -20,27 +24,75 @@ export class MCPServerManager {
         id: serverId,
         config,
         process,
-        status: 'starting'
+        status: 'starting',
+        client: null
       };
 
       this.servers.set(serverId, instance);
       this.configs.set(serverId, config);
 
       // Handle process lifecycle
-      process.on('spawn', () => {
+      process.on('spawn', async () => {
         instance.status = 'running';
-        console.log(`MCP Server ${serverId} started`);
+        console.log(`✅ MCP Server ${serverId} (${config.name}) started`);
+        
+        // Initialize MCP client for STDIO communication
+        try {
+          instance.client = new MCPClient({
+            process,
+            serverId
+          });
+          await instance.client.initialize();
+        } catch (error) {
+          console.error(`Failed to initialize MCP client for ${serverId}:`, error);
+          instance.status = 'error';
+        }
       });
 
       process.on('error', (error) => {
         instance.status = 'error';
-        console.error(`MCP Server ${serverId} error:`, error);
+        console.error(`❌ MCP Server ${serverId} error:`, error);
       });
 
       process.on('exit', (code) => {
         instance.status = 'stopped';
-        console.log(`MCP Server ${serverId} exited with code ${code}`);
+        console.log(`🔄 MCP Server ${serverId} exited with code ${code}`);
+        this.servers.delete(serverId);
       });
+
+      // Handle stderr for debugging
+      process.stderr?.on('data', (data) => {
+        console.warn(`MCP Server ${serverId} stderr:`, data.toString());
+      });
+
+    } else if (config.type === 'HTTP') {
+      if (!config.url) {
+        throw new Error('URL is required for HTTP servers');
+      }
+
+      const instance: MCPServerInstance = {
+        id: serverId,
+        config,
+        status: 'starting',
+        client: null
+      };
+
+      this.servers.set(serverId, instance);
+      this.configs.set(serverId, config);
+
+      try {
+        // Initialize HTTP client
+        instance.client = new MCPClient({
+          baseUrl: config.url,
+          serverId
+        });
+        await instance.client.initialize();
+        instance.status = 'running';
+        console.log(`✅ MCP HTTP Server ${serverId} (${config.name}) connected`);
+      } catch (error) {
+        console.error(`❌ Failed to connect to HTTP server ${serverId}:`, error);
+        instance.status = 'error';
+      }
     }
 
     return serverId;
@@ -52,33 +104,44 @@ export class MCPServerManager {
 
   async getTools(serverId: string): Promise<any[]> {
     const instance = this.servers.get(serverId);
-    if (!instance || instance.status !== 'running') {
+    if (!instance || instance.status !== 'running' || !instance.client) {
       return [];
     }
 
-    // Simulate MCP communication - in real implementation, use MCP SDK
-    return [
-      {
-        name: `tool_${serverId}_1`,
-        description: `Tool from server ${serverId}`,
-        inputSchema: {
-          type: 'object',
-          properties: {
-            input: { type: 'string' }
-          }
-        }
-      }
-    ];
+    try {
+      return await instance.client.getTools();
+    } catch (error) {
+      console.error(`Failed to get tools from server ${serverId}:`, error);
+      return [];
+    }
   }
 
   async getResources(serverId: string): Promise<any[]> {
-    // Similar to getTools but for resources
-    return [];
+    const instance = this.servers.get(serverId);
+    if (!instance || instance.status !== 'running' || !instance.client) {
+      return [];
+    }
+
+    try {
+      return await instance.client.getResources();
+    } catch (error) {
+      console.error(`Failed to get resources from server ${serverId}:`, error);
+      return [];
+    }
   }
 
   async getPrompts(serverId: string): Promise<any[]> {
-    // Similar to getTools but for prompts
-    return [];
+    const instance = this.servers.get(serverId);
+    if (!instance || instance.status !== 'running' || !instance.client) {
+      return [];
+    }
+
+    try {
+      return await instance.client.getPrompts();
+    } catch (error) {
+      console.error(`Failed to get prompts from server ${serverId}:`, error);
+      return [];
+    }
   }
 
   async getServerByTool(toolName: string, namespace: string): Promise<MCPServerConfig | null> {
@@ -86,9 +149,15 @@ export class MCPServerManager {
     const servers = await this.getServersByNamespace(namespace);
     
     for (const server of servers) {
-      const tools = await this.getTools(server.id);
-      if (tools.some(tool => tool.name === toolName)) {
-        return server;
+      if (!server.enabled) continue;
+      
+      try {
+        const tools = await this.getTools(server.id);
+        if (tools.some(tool => tool.name === toolName)) {
+          return server;
+        }
+      } catch (error) {
+        console.error(`Error checking tools for server ${server.id}:`, error);
       }
     }
 
@@ -97,23 +166,68 @@ export class MCPServerManager {
 
   async callTool(serverId: string, toolName: string, arguments_: Record<string, any>): Promise<any> {
     const instance = this.servers.get(serverId);
-    if (!instance || instance.status !== 'running') {
-      throw new Error(`Server ${serverId} is not running`);
+    if (!instance || instance.status !== 'running' || !instance.client) {
+      throw new Error(`Server ${serverId} is not running or not connected`);
     }
 
-    // Simulate tool call - in real implementation, use MCP SDK
-    return {
-      content: `Result from ${toolName} with args: ${JSON.stringify(arguments_)}`,
-      isError: false
-    };
+    try {
+      return await instance.client.callTool(toolName, arguments_);
+    } catch (error) {
+      console.error(`Failed to call tool ${toolName} on server ${serverId}:`, error);
+      throw error;
+    }
   }
 
   async stopServer(serverId: string): Promise<void> {
     const instance = this.servers.get(serverId);
-    if (instance && instance.process) {
-      instance.process.kill();
+    if (instance) {
+      if (instance.process) {
+        instance.process.kill('SIGTERM');
+        
+        // Force kill after 5 seconds if still running
+        setTimeout(() => {
+          if (instance.process && !instance.process.killed) {
+            instance.process.kill('SIGKILL');
+          }
+        }, 5000);
+      }
+      
+      // Clean up client connection
+      if (instance.client) {
+        try {
+          await instance.client.disconnect();
+        } catch (error) {
+          console.warn(`Error disconnecting client for server ${serverId}:`, error);
+        }
+      }
+      
       this.servers.delete(serverId);
+      this.configs.delete(serverId);
+      console.log(`🛑 MCP Server ${serverId} stopped`);
     }
+  }
+
+  async getServerStatus(serverId: string): Promise<'starting' | 'running' | 'stopped' | 'error' | 'not_found'> {
+    const instance = this.servers.get(serverId);
+    return instance?.status || 'not_found';
+  }
+
+  async getAllServers(): Promise<Map<string, MCPServerInstance>> {
+    return new Map(this.servers);
+  }
+
+  async restartServer(serverId: string): Promise<void> {
+    const config = this.configs.get(serverId);
+    if (!config) {
+      throw new Error(`Server configuration not found for ${serverId}`);
+    }
+
+    await this.stopServer(serverId);
+    
+    // Wait a moment before restarting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    await this.createServer(config);
   }
 }
 
@@ -122,4 +236,5 @@ interface MCPServerInstance {
   config: MCPServerConfig;
   process?: ChildProcess;
   status: 'starting' | 'running' | 'stopped' | 'error';
+  client: MCPClient | null;
 }

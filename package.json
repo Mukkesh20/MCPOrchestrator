@@ -1,18 +1,45 @@
 {
-  "name": "enhanced-MCP-Orchestrator",
+  "name": "enhanced-mcp-orchestrator",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "pnpm run dev:backend & pnpm run dev:frontend",
-    "dev:backend": "pnpm --filter backend dev",
-    "dev:frontend": "pnpm --filter frontend dev",
-    "build": "pnpm --filter backend build && pnpm --filter frontend build",
-    "start": "pnpm --filter backend start"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd packages/backend && npm run dev",
+    "dev:frontend": "cd packages/frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd packages/backend && npm run build",
+    "build:frontend": "cd packages/frontend && npm run build",
+    "start": "cd packages/backend && npm run start",
+    "install:all": "npm install && cd packages/backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist",
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "echo \"No linting configured\" && exit 0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.3.0"
+    "concurrently": "^8.2.0"
   },
-  "dependencies": {
-    "pnpm": "^10.14.0"
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "description": "An advanced MCP (Model Context Protocol) proxy with middleware support, dynamic server generation, and a chat playground.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "orchestrator",
+    "middleware",
+    "typescript",
+    "react"
+  ],
+  "author": "Enhanced MCP-Orchestrator Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/enhanced-MCP-Orchestrator.git"
   }
 }
