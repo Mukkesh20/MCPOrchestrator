@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { trpc } from '../utils/trpc';
+import { trpc } from '../hooks/useTRPC';
 
 const ServerManager = () => {
   const [showAddServer, setShowAddServer] = useState(false);

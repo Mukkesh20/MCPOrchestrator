@@ -1,6 +1,6 @@
 // packages/frontend/src/components/Dashboard.tsx
 import React from 'react';
-import { trpc } from '../utils/trpc';
+import { trpc } from '../hooks/useTRPC';
 import { Server, Cpu, MessageSquare, Zap } from 'lucide-react';
 
 const Dashboard = () => {

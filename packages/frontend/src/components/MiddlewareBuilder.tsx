@@ -1,6 +1,6 @@
 // packages/frontend/src/components/MiddlewareBuilder.tsx
 import React, { useState } from 'react';
-import { trpc } from '../utils/trpc';
+import { trpc } from '../hooks/useTRPC';
 import Editor from '@monaco-editor/react';
 import { Trash2, Play, Pause, Save } from 'lucide-react';
 

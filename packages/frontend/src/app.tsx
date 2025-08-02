@@ -1,8 +1,7 @@
 // packages/frontend/src/app.tsx
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient, trpcClient } from './hooks/useTRPC';
-import { trpc } from './utils/trpc';
+import { queryClient, trpc, trpcClient } from './hooks/useTRPC';
 import Dashboard from './components/Dashboard';
 import ServerManager from './components/ServerManager';
 import MiddlewareBuilder from './components/MiddlewareBuilder';

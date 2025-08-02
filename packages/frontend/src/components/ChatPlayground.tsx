@@ -1,12 +1,21 @@
+// packages/frontend/src/components/ChatPlayground.tsx
 import React, { useState, useRef, useEffect } from 'react';
-import { trpc } from '../utils/trpc';
-import { MessageSquare, Send, Settings, Play, User, Bot, Wrench } from 'lucide-react'; // Replace Tool with Wrench
+import { trpc } from '../hooks/useTRPC'; // Updated import
+import { MessageSquare, Send, Settings, Play, User, Bot, Wrench } from 'lucide-react';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  toolCalls?: any[];
+}
+
+interface ChatResponse {
+  id: string;
+  role: 'assistant';
+  content: string;
+  timestamp: string;
   toolCalls?: any[];
 }
 
@@ -23,8 +32,19 @@ export default function ChatPlayground() {
   const { data: namespaces } = trpc.namespaces.list.useQuery();
   const { data: tools } = trpc.chat.getTools.useQuery({ namespace: selectedNamespace });
   
-  const createSession = trpc.chat.createSession.useMutation();
-  const sendMessage = trpc.chat.sendMessage.useMutation();
+  const createSession = trpc.chat.createSession.useMutation({
+    onError: (error) => {
+      console.error('Session creation error:', error);
+      alert(`Failed to create session: ${error.message}`);
+    }
+  });
+  
+  const sendMessage = trpc.chat.sendMessage.useMutation({
+    onError: (error) => {
+      console.error('Send message error:', error);
+      alert(`Failed to send message: ${error.message}`);
+    }
+  });
 
   const [agentConfig, setAgentConfig] = useState({
     systemPrompt: 'You are a helpful AI assistant with access to various tools. Use them when appropriate to help the user.',
@@ -47,13 +67,17 @@ export default function ChatPlayground() {
   }, [messages]);
 
   const handleCreateSession = async () => {
-    const session = await createSession.mutateAsync({
-      name: `Chat Session ${new Date().toLocaleTimeString()}`,
-      namespace: selectedNamespace,
-      agentConfig
-    });
-    setCurrentSession(session.id);
-    setMessages([]);
+    try {
+      const session = await createSession.mutateAsync({
+        name: `Chat Session ${new Date().toLocaleTimeString()}`,
+        namespace: selectedNamespace,
+        agentConfig
+      });
+      setCurrentSession(session.id);
+      setMessages([]);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -71,7 +95,7 @@ export default function ChatPlayground() {
     setIsLoading(true);
 
     try {
-      const response = await sendMessage.mutateAsync({
+      const response: ChatResponse = await sendMessage.mutateAsync({
         sessionId: currentSession,
         message: inputMessage,
         namespace: selectedNamespace
@@ -81,8 +105,8 @@ export default function ChatPlayground() {
         id: response.id,
         role: 'assistant',
         content: response.content,
-        timestamp: response.timestamp,
-        toolCalls: response.toolCalls
+        timestamp: new Date(response.timestamp),
+        ...(response.toolCalls && { toolCalls: response.toolCalls })
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -129,10 +153,11 @@ export default function ChatPlayground() {
           {!currentSession ? (
             <button
               onClick={handleCreateSession}
-              className="mt-3 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              disabled={createSession.isLoading}
+              className="mt-3 w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
               <Play className="w-4 h-4 mr-2" />
-              Start New Session
+              {createSession.isLoading ? 'Creating...' : 'Start New Session'}
             </button>
           ) : (
             <div className="mt-3 text-sm text-green-600 flex items-center">
@@ -243,58 +268,40 @@ export default function ChatPlayground() {
           <>
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Start a conversation</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Send a message to begin chatting with your AI agent.
-                  </p>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-3xl flex space-x-3 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        message.role === 'user' ? 'bg-blue-500' : 'bg-gray-500'
-                      }`}>
-                        {message.role === 'user' ? (
-                          <User className="w-4 h-4 text-white" />
-                        ) : (
-                          <Bot className="w-4 h-4 text-white" />
-                        )}
+              {messages.map((message) => (
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className="max-w-3xl flex space-x-3">
+                    {message.role !== 'user' && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white" />
                       </div>
-                      <div className={`rounded-lg px-4 py-2 ${
-                        message.role === 'user' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-white text-gray-900 shadow-sm border'
-                      }`}>
-                        <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                        {message.toolCalls && message.toolCalls.length > 0 && (
-                          <div className="mt-2 space-y-2">
-                            {message.toolCalls.map((toolCall, index) => (
-                              <div key={index} className="text-xs bg-gray-100 rounded p-2">
-                                <div className="font-medium">🔧 {toolCall.name}</div>
-                                <div className="text-gray-600 mt-1">
-                                  {JSON.stringify(toolCall.arguments, null, 2)}
-                                </div>
-                                {toolCall.result && (
-                                  <div className="text-gray-800 mt-1 font-medium">
-                                    Result: {JSON.stringify(toolCall.result)}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                    )}
+                    <div className={`${message.role === 'user' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-900 shadow-sm border'
+                    } rounded-lg px-4 py-2`}>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="text-xs text-gray-500">
+                            Tools used: {message.toolCalls.map(call => call.name).join(', ')}
                           </div>
-                        )}
-                        <div className="text-xs opacity-70 mt-1">
-                          {message.timestamp.toLocaleTimeString()}
                         </div>
+                      )}
+                      <div className="text-xs mt-1 opacity-70">
+                        {message.timestamp instanceof Date 
+                          ? message.timestamp.toLocaleTimeString() 
+                          : new Date(message.timestamp).toLocaleTimeString()}
                       </div>
                     </div>
+                    {message.role === 'user' && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
                   </div>
-                ))
-              )}
+                </div>
+              ))}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-3xl flex space-x-3">
@@ -330,7 +337,7 @@ export default function ChatPlayground() {
                 </div>
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
+                  disabled={!inputMessage.trim() || isLoading || !currentSession}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />

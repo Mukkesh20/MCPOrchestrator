@@ -1,8 +1,10 @@
 // packages/frontend/src/hooks/useTRPC.ts
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createTRPCReact } from '@trpc/react-query';
+import { httpBatchLink } from '@trpc/client';
 import { QueryClient } from '@tanstack/react-query';
 import type { AppRouter } from '../../../backend/src/routes/trpc';
 
+// Create the QueryClient
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -17,7 +19,11 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const trpcClient = createTRPCClient<AppRouter>({
+// Create the TRPC React client
+export const trpc = createTRPCReact<AppRouter>();
+
+// Create the TRPC client for the Provider
+export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: '/trpc',
