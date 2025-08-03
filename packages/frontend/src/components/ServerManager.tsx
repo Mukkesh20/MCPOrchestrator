@@ -27,6 +27,16 @@ const ServerManager = () => {
   const namespacesQuery = trpc.namespaces.list.useQuery();
   
   const serversQuery = trpc.servers.list.useQuery();
+  // Create a properly typed input for the mutation
+  interface CreateServerInput {
+    name: string;
+    type: ServerType;
+    command?: string;
+    args?: string[];
+    url?: string;
+    namespace: string;
+  }
+
   const createServerMutation = trpc.servers.create.useMutation({
     onSuccess: () => {
       serversQuery.refetch();
@@ -72,43 +82,64 @@ const ServerManager = () => {
       return;
     }
     
-    // Build the base payload
-    const payload: any = {
-      name: newServer.name.trim(),
-      type: newServer.type,
-      namespace: newServer.namespace.trim(),
-    };
-    
-    // Add type-specific fields with proper validation
-    if (newServer.type === 'STDIO') {
-      if (!newServer.command.trim()) {
-        alert('Command is required for STDIO servers');
-        return;
-      }
-      payload.command = newServer.command.trim();
+    try {
+      // Create a simplified payload structure with only the necessary fields
+      let name = newServer.name.trim();
+      let type = newServer.type as 'STDIO' | 'HTTP';
+      let namespace = newServer.namespace.trim();
       
-      // Handle args properly - filter out empty strings
-      if (newServer.args.trim()) {
-        payload.args = newServer.args.trim().split(/\s+/).filter(arg => arg.length > 0);
-      } else {
-        payload.args = []; // THIS WAS THE PROBLEM - was truncated as "payload.a"
+      // Type-specific validation and data preparation
+      if (type === 'STDIO') {
+        if (!newServer.command.trim()) {
+          alert('Command is required for STDIO servers');
+          return;
+        }
+        
+        const command = newServer.command.trim();
+        let args: string[] = [];
+        
+        if (newServer.args.trim()) {
+          args = newServer.args.trim().split(/\s+/).filter(arg => arg.length > 0);
+        }
+        
+        console.log('Submitting STDIO server:', { name, type, namespace, command, args });
+        
+        // Direct call with explicit params
+        createServerMutation.mutate({
+          name: name,
+          type: type,
+          namespace: namespace,
+          command: command,
+          args: args
+        });
+      } else { // HTTP type
+        if (!newServer.url.trim()) {
+          alert('URL is required for HTTP servers');
+          return;
+        }
+        
+        try {
+          new URL(newServer.url.trim()); // Validate URL format
+        } catch (error) {
+          alert('Please enter a valid URL');
+          return;
+        }
+        
+        const url = newServer.url.trim();
+        console.log('Submitting HTTP server:', { name, type, namespace, url });
+        
+        // Direct call with explicit params
+        createServerMutation.mutate({
+          name: name,
+          type: type,
+          namespace: namespace,
+          url: url
+        });
       }
-    } else if (newServer.type === 'HTTP') {
-      if (!newServer.url.trim()) {
-        alert('URL is required for HTTP servers');
-        return;
-      }
-      try {
-        new URL(newServer.url.trim()); // Validate URL format
-        payload.url = newServer.url.trim();
-      } catch (error) {
-        alert('Please enter a valid URL');
-        return;
-      }
+    } catch (err) {
+      console.error('Error in server submission:', err);
+      alert(`Error creating server: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-    
-    console.log('Submitting payload:', payload); // Debug log
-    createServerMutation.mutate(payload);
   };
 
   return (

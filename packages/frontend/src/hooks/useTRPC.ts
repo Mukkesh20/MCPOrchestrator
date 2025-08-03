@@ -27,9 +27,29 @@ export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: '/trpc',
+      // Set maxURLLength to 0 to force POST for all requests
+      maxURLLength: 0,
       headers: () => ({
         'Content-Type': 'application/json',
       }),
+      fetch: async (url, options) => {
+        // Add logging to debug request payloads
+        console.log('🚀 Sending tRPC request to:', url);
+        if (options?.body) {
+          try {
+            const bodyContent = options.body as string;
+            console.log('📦 Raw request payload:', bodyContent);
+            const parsedBody = JSON.parse(bodyContent);
+            console.log('📦 Parsed request payload:', parsedBody);
+          } catch (e) {
+            console.error('Could not parse request body:', e);
+            console.log('📦 Unparsed request payload:', options.body);
+          }
+        } else {
+          console.warn('⚠️ No request body found!');
+        }
+        return fetch(url, options);
+      },
     }),
   ],
 });

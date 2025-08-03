@@ -27,18 +27,27 @@ export const appRouter = t.router({
     }),
 
     create: t.procedure
-      .input(z.object({
-        name: z.string().min(1, "Name is required"),
-        type: z.enum(['STDIO', 'HTTP']),
-        command: z.string().optional(),
-        args: z.array(z.string()).optional(),
-        url: z.string().optional(),
-        namespace: z.string().min(1, "Namespace is required"),
-      }))
+      .input(
+        z.object({
+          name: z.string().min(1, "Name is required"),
+          type: z.enum(['STDIO', 'HTTP']),
+          command: z.string().optional(),
+          args: z.array(z.string()).optional(),
+          url: z.string().optional(),
+          namespace: z.string().min(1, "Namespace is required"),
+        }).passthrough()
+      )
       .mutation(async ({ input }) => {
-        console.log('📥 Received server creation input:', JSON.stringify(input, null, 2));
-
-        // Validate based on type
+        console.log('🔍 Simplified server creation:', input);
+        console.log('📥 Input type:', typeof input);
+        
+        // Perform basic validation
+        if (!input) {
+          console.error('❌ No input received');
+          throw new Error('Server creation requires input data');
+        }
+        
+        // Type-specific validation
         if (input.type === 'STDIO' && !input.command) {
           throw new Error('Command is required for STDIO servers');
         }
@@ -46,12 +55,15 @@ export const appRouter = t.router({
         if (input.type === 'HTTP' && !input.url) {
           throw new Error('URL is required for HTTP servers');
         }
+        
+        // Log the valid input data
+        console.log('📥 Validated server creation input:', JSON.stringify(input, null, 2));
 
         const server = {
           id: Math.random().toString(36).substring(2, 15),
           ...input,
           enabled: true,
-          middlewares: [],
+          middlewares: [] as string[],
           createdAt: new Date().toISOString()
         };
 
