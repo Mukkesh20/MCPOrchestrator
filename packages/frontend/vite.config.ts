@@ -16,7 +16,7 @@ export default defineConfig({
     }
   }],
   server: {
-    port: 3000,
+    port: 3003, // Use port 3003 to avoid conflicts with backend (port 3002)
     proxy: {
       '/trpc': {
         target: 'http://localhost:3002',

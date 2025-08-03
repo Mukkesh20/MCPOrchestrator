@@ -26,15 +26,14 @@ export const trpc = createTRPCReact<AppRouter>();
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: '/trpc',
+      url: 'http://localhost:3002/api/trpc',
       // Set maxURLLength to 0 to force POST for all requests
       maxURLLength: 0,
-      headers: () => ({
-        'Content-Type': 'application/json',
-      }),
       fetch: async (url, options) => {
+        // Add CORS headers to ensure the request is allowed
         // Add logging to debug request payloads
         console.log('🚀 Sending tRPC request to:', url);
+        
         if (options?.body) {
           try {
             const bodyContent = options.body as string;
@@ -48,7 +47,16 @@ export const trpcClient = trpc.createClient({
         } else {
           console.warn('⚠️ No request body found!');
         }
-        return fetch(url, options);
+        
+        return fetch(url, {
+          ...options,
+          credentials: 'include',
+          headers: {
+            ...options?.headers,
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          }
+        });
       },
     }),
   ],

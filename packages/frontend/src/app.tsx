@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import ServerManager from './components/ServerManager';
 import MiddlewareBuilder from './components/MiddlewareBuilder';
 import ChatPlayground from './components/ChatPlayground';
+import Diagnostic from './components/Diagnostic';
 
 function App() {
   return (
@@ -29,6 +30,9 @@ function App() {
                     <Link to="/chat" className="flex items-center px-3 py-2 text-sm font-medium">
                       Chat Playground
                     </Link>
+                    <Link to="/diagnostic" className="flex items-center px-3 py-2 text-sm font-medium text-red-600">
+                      Diagnostics
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -40,6 +44,7 @@ function App() {
                 <Route path="/servers" element={<ServerManager />} />
                 <Route path="/middlewares" element={<MiddlewareBuilder />} />
                 <Route path="/chat" element={<ChatPlayground />} />
+                <Route path="/diagnostic" element={<Diagnostic />} />
               </Routes>
             </main>
           </div>
