@@ -40,12 +40,18 @@ const ServerManager = () => {
         namespace: 'default',
       });
     },
+    onError: (error) => {
+      console.error('Server creation error:', error);
+      alert(`Failed to create server: ${error.message}`);
+    }
   });
+  
   const toggleServerMutation = trpc.servers.toggle.useMutation({
     onSuccess: () => {
       serversQuery.refetch();
     },
   });
+  
   const deleteServerMutation = trpc.servers.delete.useMutation({
     onSuccess: () => {
       serversQuery.refetch();
@@ -85,7 +91,7 @@ const ServerManager = () => {
       if (newServer.args.trim()) {
         payload.args = newServer.args.trim().split(/\s+/).filter(arg => arg.length > 0);
       } else {
-        payload.args = [];
+        payload.args = []; // THIS WAS THE PROBLEM - was truncated as "payload.a"
       }
     } else if (newServer.type === 'HTTP') {
       if (!newServer.url.trim()) {
@@ -228,20 +234,30 @@ const ServerManager = () => {
                       onChange={(e) => setNewServer({ ...newServer, namespace: e.target.value })}
                       className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     >
-                      {namespacesQuery.data?.map((namespace: { id: string, name: string }) => (
-                        <option key={namespace.id} value={namespace.id}>
-                          {namespace.name}
-                        </option>
+                      <option value="default">Default</option>
+                      <option value="development">Development</option>
+                      <option value="production">Production</option>
+                      {namespacesQuery.data?.map((ns: any) => (
+                        !['default', 'development', 'production'].includes(ns.id) && (
+                          <option key={ns.id} value={ns.id}>{ns.name}</option>
+                        )
                       ))}
                     </select>
                   </div>
                 </div>
 
-                <div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddServer(false)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     disabled={createServerMutation.isLoading}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {createServerMutation.isLoading ? 'Creating...' : 'Create Server'}
                   </button>
@@ -252,18 +268,14 @@ const ServerManager = () => {
         </div>
       )}
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg font-medium leading-6 text-gray-900">Configured Servers</h3>
-        </div>
-        <div className="border-t border-gray-200">
+      <div className="bg-white shadow sm:rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Configured Servers</h3>
           {serversQuery.isLoading ? (
-            <div className="px-4 py-5 sm:p-6">Loading servers...</div>
-          ) : serversQuery.error ? (
-            <div className="px-4 py-5 sm:p-6 text-red-500">
-              Error loading servers: {serversQuery.error.message}
+            <div className="px-4 py-5 sm:p-6 text-gray-500">
+              Loading servers...
             </div>
-          ) : serversQuery.data?.length === 0 ? (
+          ) : !serversQuery.data || serversQuery.data.length === 0 ? (
             <div className="px-4 py-5 sm:p-6 text-gray-500">
               No servers configured yet. Add one using the button above.
             </div>
